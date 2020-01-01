@@ -1,6 +1,6 @@
 # map-integration-web
 
-### Test Digni API response on Google Map 
+### Test [Dingi MAP API](http://www.dingi.tech/api.php) response on Google Map 
 
 <br>To test Dingi APIs on google map, 
 <br>Run <code>npm install</code>
