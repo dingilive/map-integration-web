@@ -63,16 +63,16 @@
     <div class="floating-panel2">
       <input onclick="clearMarkers();" type=button value="Hide Markers">
       <input onclick="showMarkers();" type=button value="Show All Markers">
-      <input onclick="deleteMarkers();" type=button value="Delete Markers">
-      <input id="navigate" type="button" value="Draw Route">
-      <input id="draw_polygon" type="button" value="Draw Polygon">
-      <input onclick="initMap();" id="init_map" type="button" value="Reset">
+        <input onclick="resetMap();" id="init_map" type="button" value="Reset">
+      <input id="navigate_dingi" type="button" value="Draw Dingi Map Route">
+      <input id="navigate_google" type="button" value="Draw Google Map Route">
     </div>
     <div class="floating-panel">
       <input id="latlng" type="text" value="">
       <input id="rev-geocode" type="button" value="Reverse Geocode">
     </div>
 
+    <!-- paste your Google API key below as Google API key parameter -->
     <script async defer
       src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6zpKAzccF42CxEjubDpd-L0PJ6v9dWCk&callback=initMap">
     </script>
@@ -83,8 +83,8 @@
       var markers = [];
       var points = [];
       var waypoints = [];
-      var dingi_url = "http://dev.maps.api.dingi.live"
-
+      var dingi_url = "http://dev.maps.api.dingi.live";
+      var DINGI_API_KEY = '8ad2645c-ad1f-4492-ab28-efedc7beced2';
       function initMap() {
         map = new google.maps.Map(document.getElementById('map'), {
           zoom: 14,
@@ -94,7 +94,7 @@
         var infowindow = new google.maps.InfoWindow;
 
         document.getElementById('rev-geocode').addEventListener('click', function() {
-          geocodeLatLng(infowindow);
+          //geocodeLatLng(infowindow);
         });
 
         var directionsDisplay = new google.maps.DirectionsRenderer;
@@ -102,18 +102,34 @@
 
         directionsDisplay.setMap(map);
 
-        document.getElementById('navigate').addEventListener('click', function() {
-          calculateAndDisplayRoute(directionsService, directionsDisplay);
+        document.getElementById('navigate_dingi').addEventListener('click', function() {
+          calculateAndDisplayDingiRoute();
         });
 
-        document.getElementById('draw_polygon').addEventListener('click', function() {
-          draw_polygon(points);
-        });
+          document.getElementById('navigate_google').addEventListener('click', function() {
+              calculateAndDisplayGoogleRoute(directionsService, directionsDisplay);
+          });
+
 
         google.maps.event.addListener(map, 'click', function(event){
           set_points(event);
         });
       }
+
+      function resetMap() {
+          markers = [];
+          points = [];
+          waypoints = [];
+          initMap();
+      }
+
+      function setInfoWindow(infowindow,dingiAddress, googleAddress, marker) {
+          infowindow.setContent(
+              "<p style='color: #d55858'>" + "Dingi:  " + dingiAddress + "</p>"+
+              "<p style='color: #627fbd'>" + "Google:  " + googleAddress +"</p>");
+          infowindow.open(map, marker);
+      }
+
 
 
       function set_points(event){
@@ -121,47 +137,30 @@
         document.getElementById('latlng').value = event.latLng.lat().toString() + ','+  event.latLng.lng().toString();
       }
 
-      function geocodeLatLng(infowindow) {
+
+      function geocodeLatLng() {
         var input = document.getElementById('latlng').value;
         var latlngStr = input.split(',', 2);
         var latlng = {lat: parseFloat(latlngStr[0]), lng: parseFloat(latlngStr[1])};
         //console.log(latlng);
-        axios.get(`${dingi_url}/geocode/reverse/`, {
-                  headers: {
-                    'x-api-key': '8ad2645c-ad1f-4492-ab28-efedc7beced2'
-                  },
-                  params: {
-                    'language': 'en',
-                    'lat': latlng.lat,
-                    'lng': latlng.lng
-                  }
-                }).then((response) => {
-                    //console.log(response.status);
-                    if (response.status === 200) {
-                      var marker = new google.maps.Marker({
-                        position: latlng,
-                        map: map
-                      });
-                  //console.log(JSON.stringify(response.data.result));
-                  infowindow.setContent(response.data.result.address);
-                  infowindow.open(map, marker);
-                  //console.log('response dekhi ' + JSON.stringify(response.data.routes[0].geometry));
+      }
 
-            //this.props.history.goBack();
-            //this.props.closeModalHandler();
-          }
-          else {
-            //  console.log('as;lmaf;');
-          }
-        })
-                .catch(function (error) {
-                  console.log(error);
-                });
+      function draw_google_line(encoded_data, color) {
+          var decode = google.maps.geometry.encoding.decodePath(encoded_data);
+          var line = new google.maps.Polyline({
+              path: decode,
+              strokeColor: color,  //'#ff1a1a',
+              strokeOpacity: 1.0,
+              strokeWeight: 4,
+              zIndex: 5
+          });
+
+          line.setMap(map);
       }
 
 
 
-      function calculateAndDisplayRoute(directionsService, directionsDisplay) {
+      function calculateAndDisplayDingiRoute() {
         if (markers.length < 2) {
           window.alert('Not enough point!');
         } else {
@@ -177,13 +176,13 @@
           axios.get(
             `${dingi_url}/direction/driving/?criteria=fastest&coordinates=${startlng}a${startlat}b${endlng}a${endlat}`, {
             headers: {
-              'x-api-key': '8ad2645c-ad1f-4492-ab28-efedc7beced2'
+              'x-api-key': DINGI_API_KEY
             }
           }).then((response) => {
-            console.log(response.status);
+           // console.log(response.status);
             if (response.status === 200) {
               //console.log('response dekhi ' + JSON.stringify(response.data.routes[0].geometry));
-              draw_line(response.data.routes[0].geometry)
+              draw_line(response.data.routes[0].geometry, '#D55858')
               //this.props.history.goBack();
               //this.props.closeModalHandler();
             }
@@ -194,39 +193,116 @@
               .catch(function (error) {
                 console.log(error);
               });
-            /*directionsService.route({
-            origin: {lat: start.lat(), lng: start.lng()},  
-            destination: {lat: end.lat(), lng: end.lng()},
-            waypoints: waypoints.slice(1, arr_size-1),
-            // Note that Javascript allows us to access the constant
-            // using square brackets and a string value as its
-            // "property."
-            travelMode: google.maps.TravelMode["DRIVING"]
-          }, function(response, status) {
-            if (status == 'OK') {
-              console.log(response);
-              //directionsDisplay.setDirections(response);
-              draw_line(response.routes[0]['overview_polyline'])
-            } else {
-              window.alert('Directions request failed due to ' + status);
-            }
-          });*/
         }
       }
+
+      function calculateAndDisplayGoogleRoute(directionsService, directionsDisplay) {
+          if (markers.length < 2) {
+              window.alert('Not enough point!');
+          }
+          else{
+              var arr_size = markers.length;
+              var start = markers[0].position;
+              var end = markers[arr_size - 1].position;
+
+              console.log(start.lat(), start.lng(), end.lat(), end.lng());
+              directionsService.route({
+                  origin: {lat: start.lat(), lng: start.lng()},
+                  destination: {lat: end.lat(), lng: end.lng()},
+                  waypoints: waypoints.slice(1, arr_size-1),
+                  // Note that Javascript allows us to access the constant
+                  // using square brackets and a string value as its
+                  // "property."
+                  travelMode: google.maps.TravelMode["DRIVING"]
+              }, function(response, status) {
+                  if (status == 'OK') {
+                      //console.log(response);
+                      //directionsDisplay.setDirections(response);
+                      draw_google_line(response.routes[0]['overview_polyline'], '#627fbd')
+                  } else {
+                      window.alert('Directions request failed due to ' + status);
+                  }
+              });
+          }
+      }
+
+
       // Adds a marker to the map and push to the array.
-      function addMarker(location) {
+      async function addMarker(location) {
         console.log(location.lat(), location.lng());
         var marker = new google.maps.Marker({
           position: location,
           map: map,
           label: markers.length.toString(),
         });
+        //console.log(dingiAddress+ '   ' +googleAddress);
         markers.push(marker);
         points.push({lat: location.lat(), lng: location.lng()});
         waypoints.push({
           location: {lat: location.lat(), lng: location.lng()},
           stopover: true
         });
+      dingiGeocodeLatlng(location, marker);
+      }
+
+      function dingiGeocodeLatlng(location, marker) {
+          console.log('akfma;f');
+          var lat = location.lat();
+          var lng = location.lng();
+          axios.get(`${dingi_url}/geocode/reverse/`, {
+              headers: {
+                  'x-api-key': DINGI_API_KEY
+              },
+              params: {
+                  'language': 'en',
+                  'lat': lat,
+                  'lng': lng
+              }
+          }).then((response) => {
+              //console.log(response.status);
+              if (response.status === 200) {
+                  //console.log(JSON.stringify(response.data.result));
+                  /*infowindow.setContent(response.data.result.address);
+                  infowindow.open(map, marker);*/
+                  var reverse_dingi = response.data.result.address;
+                  var geocoder = new google.maps.Geocoder;
+                  console.log('get called bro');
+                  var latlng = {lat: location.lat(), lng: location.lng()};
+                  geocoder.geocode({'location': latlng}, function(results, status) {
+                      if (status === 'OK') {
+                          if (results[0]) {
+                              var infowindow = new google.maps.InfoWindow;
+                              setInfoWindow(infowindow, reverse_dingi, results[0].formatted_address, marker);
+                          } else {
+                              window.alert('No results found');
+                          }
+                      } else {
+                          window.alert('Geocoder failed due to: ' + status);
+                      }
+                  });
+              }
+          })
+              .catch(function (error) {
+                  console.log(error);
+              });
+      }
+
+      function geocodeLatLng(location) {
+          var geocoder = new google.maps.Geocoder;
+          console.log('get called bro');
+          var latlng = {lat: location.lat(), lng: location.lng()};
+          geocoder.geocode({'location': latlng}, function(results, status) {
+              if (status === 'OK') {
+                  if (results[0]) {
+                      console.log(results[0].formatted_address);
+
+                  } else {
+                      window.alert('No results found');
+                  }
+              } else {
+                  window.alert('Geocoder failed due to: ' + status);
+              }
+          });
       }
 
       // Sets the map on all markers in the array.
@@ -247,12 +323,6 @@
       }
 
       // Deletes all markers in the array by removing references to them.
-      function deleteMarkers() {
-        clearMarkers();
-        markers = [];
-        points = [];
-        waypoints = [];
-      }
 
       function convertToLatLng(decoded) {
         let path = [];
@@ -263,8 +333,13 @@
         return path;
       }
 
-      function draw_line(encoded_data) {
-        console.log(encoded_data);
+      function resetRoute() {
+          var line=[];
+          line.setMap(map);
+      }
+
+      function draw_line(encoded_data, color) {
+        //console.log(encoded_data);
         //console.log('afklf;f;s');
         //get Array of path consisting latitude and longitude
         var decoded = polyline.decode(encoded_data, 6);
@@ -274,7 +349,7 @@
        // console.log(path);
         var line = new google.maps.Polyline({
           path: path,
-          strokeColor: '#ff1a1a',
+          strokeColor: color,
           strokeOpacity: 1.0,
           strokeWeight: 4,
           zIndex: 5
